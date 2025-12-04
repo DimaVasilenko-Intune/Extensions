@@ -1,0 +1,22 @@
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.log
+*.tmp
+~*
+*.bak
+*.old
+
+# Chrome extension files
+*.crx
+*.pem
