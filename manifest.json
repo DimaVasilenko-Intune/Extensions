@@ -1,16 +1,13 @@
 {
   "manifest_version": 3,
   "name": "App Packaging Helper",
-  "version": "2.0.1",
-  "description": "Helps IT admins find installer files and packaging information from vendor websites",
-  "action": {
-    "default_popup": "src/popup/popup.html",
-    "default_title": "App Packaging Helper"
-  },
+  "version": "3.0.0",
+  "description": "Helps IT admins package applications by detecting installers and generating packaging information",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -18,11 +15,7 @@
   "background": {
     "service_worker": "src/background/service-worker.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  "action": {
+    "default_popup": "src/popup/popup.html"
+  }
 }

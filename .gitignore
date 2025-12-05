@@ -1,22 +1,31 @@
 # Node modules
 node_modules/
+backend/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+backend/*.log
+
+# Environment variables
+.env
+.env.local
 
 # OS files
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# IDE files
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Temporary files
-*.log
-*.tmp
-~*
-*.bak
-*.old
-
-# Chrome extension files
+# Chrome extension artifacts
 *.crx
 *.pem
+*.zip
+
+# Temporary files
+tmp/
+temp/

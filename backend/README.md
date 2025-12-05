@@ -1,26 +1,29 @@
 # App Packaging Helper - Backend API
 
-Node.js + Express backend for the App Packaging Helper Chrome Extension.
+Node.js + Express backend server for the App Packaging Helper Chrome Extension.
 
-## Features
+## 🎯 Purpose
 
-- **License Management**: 30-day trial + paid license system
-- **App Analysis Engine**: Web crawler + metadata extractor for software installers
-- **Security**: URL validation, protocol blocking, internal IP blocking
+Analyzes installer URLs and generates deployment-ready packaging information by:
+- Crawling vendor documentation pages
+- Extracting silent install commands
+- Classifying installer types (MSI, EXE, Archive)
+- Providing confidence-scored packaging commands
 
-## Requirements
+---
 
-- Node.js 18+ (ES modules)
+## 🚀 Quick Start
+
+### Requirements
+- Node.js 16+
 - npm or yarn
 
-## Installation
+### Installation
 
 ```bash
 cd backend
 npm install
 ```
-
-## Usage
 
 ### Start Server
 
@@ -28,252 +31,318 @@ npm install
 npm start
 ```
 
-Server runs on `http://localhost:3000`
+Server runs on `http://localhost:3001`
 
-### Development
+---
 
-For automatic restart on changes:
-
-```bash
-npm run dev  # requires nodemon: npm install -g nodemon
-```
-
-## API Endpoints
+## 📡 API Endpoints
 
 ### Health Check
 
-```
-GET /
+```http
+GET /health
 ```
 
 Response:
 ```json
 {
   "status": "ok",
-  "service": "App Packaging Helper API",
-  "version": "1.0.0"
+  "timestamp": "2024-01-15T12:00:00.000Z"
 }
 ```
 
-### Check License
+---
 
-```
-POST /api/checkLicense
-```
+### Analyze Installer
 
-Request:
-```json
-{
-  "userId": "user-unique-id",
-  "extensionVersion": "1.0.0"
-}
-```
-
-Response (Trial):
-```json
-{
-  "userId": "user-unique-id",
-  "status": "trial",
-  "daysLeft": 28,
-  "expiresAt": "2024-02-15T12:00:00.000Z",
-  "message": "Trial active. 28 days remaining."
-}
-```
-
-Response (Paid):
-```json
-{
-  "userId": "user-unique-id",
-  "status": "active",
-  "licenseType": "paid",
-  "expiresAt": "2025-01-15T12:00:00.000Z",
-  "message": "License active."
-}
-```
-
-Response (Expired):
-```json
-{
-  "userId": "user-unique-id",
-  "status": "expired",
-  "daysLeft": 0,
-  "message": "Trial expired. Please purchase a license."
-}
-```
-
-### Analyze App
-
-```
-POST /api/analyzeApp
+```http
+POST /analyzeApp
 ```
 
 Request:
 ```json
 {
   "url": "https://www.7-zip.org/download.html",
-  "maxPages": 5
+  "installerUrl": "https://www.7-zip.org/a/7z2501-x64.exe",
+  "filename": "7z2501-x64.exe"
 }
 ```
 
-Response:
+Response (MSI):
 ```json
 {
-  "installers": [
+  "success": true,
+  "packaging": [
     {
-      "url": "https://www.7-zip.org/a/7z2301-x64.exe",
-      "type": ".exe",
-      "filename": "7z2301-x64.exe"
+      "filename": "keepass-2.60.msi",
+      "version": "2.60",
+      "installerType": "MSI",
+      "classification": {
+        "kind": "MSI",
+        "extension": ".msi",
+        "baseName": "keepass-2.60",
+        "displayName": "Windows Installer (MSI)"
+      },
+      "silentInstallCommand": "msiexec /i \"keepass-2.60.msi\" /qn /norestart",
+      "uninstallCommand": "msiexec /x {PRODUCT-CODE-GOES-HERE} /qn /norestart",
+      "detectionRule": {
+        "type": "msi",
+        "note": "MSI installers are typically detected using the MSI ProductCode in deployment tools (Intune, ConfigMgr, etc.). No custom file-based detection is required.",
+        "recommendation": "Configure detection using the MSI ProductCode from this MSI file."
+      },
+      "confidence": {
+        "overall": "HIGH",
+        "installCommand": "HIGH",
+        "uninstallCommand": "MEDIUM",
+        "detection": "N/A"
+      },
+      "warnings": [
+        "ProductCode could not be extracted automatically in this environment.",
+        "Replace {PRODUCT-CODE-HERE} with the actual MSI ProductCode."
+      ],
+      "notes": [
+        "MSI installers use the Windows Installer service and follow standardized installation patterns.",
+        "The /qn switch provides a fully silent installation with no user interface.",
+        "The /norestart switch prevents automatic system restart after installation."
+      ]
     }
   ],
-  "rawHtmlPagesCount": 3,
-  "parsedMetadata": {
-    "versions": ["23.01"],
-    "msiFlags": ["/qn", "/norestart"],
-    "exeFlags": ["/S"]
-  },
-  "notes": [
-    "Found 3 installer links",
-    "Detected version: 23.01"
-  ],
-  "analysisMetadata": {
-    "requestedUrl": "https://www.7-zip.org/download.html",
-    "crawledPages": 3,
-    "durationMs": 1542,
-    "timestamp": "2024-01-15T14:30:00.000Z"
-  }
+  "pagesCrawled": 0
 }
 ```
 
-### Database Statistics (Admin)
-
-```
-GET /api/stats
-```
-
-Response:
+Response (EXE):
 ```json
 {
-  "totalUsers": 150,
-  "activeTrials": 45,
-  "activePaidLicenses": 85,
-  "expiredAccounts": 20
+  "success": true,
+  "packaging": [
+    {
+      "filename": "7z2501-x64.exe",
+      "installerType": "EXE",
+      "silentInstallCommand": "\"7z2501-x64.exe\" /S",
+      "uninstallCommand": "Check registry: HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+      "detectionRule": {
+        "type": "file",
+        "path": "%ProgramFiles%\\7-Zip\\7-Zip.exe",
+        "note": "This is a generic detection path. Verify actual installation location after test deployment."
+      },
+      "confidence": {
+        "overall": "HIGH",
+        "installCommand": "HIGH",
+        "uninstallCommand": "LOW",
+        "detection": "LOW"
+      },
+      "warnings": [],
+      "sourcePages": [
+        "https://www.7-zip.org/download.html"
+      ]
+    }
+  ],
+  "pagesCrawled": 5
 }
 ```
 
-## Security Features
+---
+
+## 🏗️ Architecture
+
+### Installer Classification
+
+```javascript
+// Step 1: Classify installer by extension
+classifyInstaller(filename) → { kind: 'MSI' | 'EXE' | 'ARCHIVE' | 'UNKNOWN' }
+
+// Step 2: Route to appropriate analyzer
+- MSI → msi-analyzer.js (HIGH confidence)
+- EXE → exe-analyzer.js (documentation crawling + fallbacks)
+- ARCHIVE → archive-analyzer.js (guidance only)
+```
+
+### Analysis Flow
+
+```
+Extension Request
+    ↓
+server.js (Express)
+    ↓
+crawler.js (Main Engine)
+    ↓
+classifyInstaller()
+    ↓
+┌─────────┬─────────┬──────────┐
+│   MSI   │   EXE   │  ARCHIVE │
+└─────────┴─────────┴──────────┘
+    ↓           ↓          ↓
+MSI Analyzer  EXE Analyzer  Archive Analyzer
+    ↓           ↓          ↓
+Standardized  Docs Crawl  Guidance
+Commands      + Fallback   Only
+```
+
+---
+
+## 🔧 Key Features
+
+### MSI Analysis (HIGH Confidence)
+- Standardized `/qn /norestart` switches
+- ProductCode-based uninstall
+- No file-based detection (uses ProductCode)
+- Always HIGH confidence
+
+### EXE Analysis (Variable Confidence)
+- Crawls vendor documentation for silent switches
+- Falls back to common patterns (`/S`, `/SILENT`, `/VERYSILENT`)
+- File-based detection with generic path
+- HIGH confidence if documented, LOW if fallback
+
+### Archive Analysis (Guidance)
+- Detects portable apps and zip files
+- Provides extraction guidance
+- No install commands (N/A)
+
+---
+
+## 🛡️ Security
 
 ### URL Validation
-
-The crawler blocks:
-- `file://` protocol
-- `ftp://` protocol
-- Localhost (`localhost`, `127.0.0.1`)
-- Internal IPs (`10.x.x.x`, `172.16-31.x.x`, `192.168.x.x`)
+- Only HTTP(S) protocols allowed
+- Rejects `file://`, `ftp://`, etc.
+- 400 error for invalid URLs
 
 ### Rate Limiting
-
-- 500ms delay between page crawls
 - 10-second timeout per request
-- Maximum 10 pages per analysis (hard limit)
+- Exponential backoff on retries
+- Max 3 retry attempts
 
-## Database
+---
 
-License data stored in `backend/data/licenses.json`:
-
-```json
-[
-  {
-    "userId": "user-123",
-    "createdAt": "2024-01-15T12:00:00.000Z",
-    "lastSeen": "2024-01-15T14:30:00.000Z",
-    "trialStartDate": "2024-01-15T12:00:00.000Z",
-    "paidLicense": null
-  }
-]
-```
-
-Paid license structure:
-```json
-{
-  "paidLicense": {
-    "purchaseDate": "2024-01-20T10:00:00.000Z",
-    "expiresAt": "2025-01-20T10:00:00.000Z"
-  }
-}
-```
-
-## Testing
-
-### Test License Check
-
-```bash
-curl -X POST http://localhost:3000/api/checkLicense \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"test-user-123","extensionVersion":"1.0.0"}'
-```
-
-### Test App Analysis
-
-```bash
-curl -X POST http://localhost:3000/api/analyzeApp \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://www.7-zip.org/download.html","maxPages":3}'
-```
-
-### Test Crawler
-
-```bash
-curl http://localhost:3000/api/test-crawl
-```
-
-## Error Handling
-
-All errors return JSON:
-
-```json
-{
-  "error": "Description of error"
-}
-```
-
-HTTP Status Codes:
-- `400`: Bad request (invalid parameters)
-- `404`: Resource not found
-- `500`: Server error
-
-## File Structure
+## 📂 File Structure
 
 ```
 backend/
-├── index.js              # Express server + routing
-├── package.json          # Dependencies
-├── data/
-│   └── licenses.json     # User database
-├── lib/
-│   ├── db.js            # License database manager
-│   ├── crawler.js       # Web crawler
-│   └── parser.js        # HTML parser
-└── routes/
-    ├── license.js       # License endpoints
-    └── analyze.js       # App analysis endpoints
+├── server.js              # Express API server
+├── crawler.js             # Main analysis engine
+├── classifier.js          # Installer classification
+├── analyzers/
+│   ├── msi-analyzer.js    # MSI packaging rules
+│   ├── exe-analyzer.js    # EXE heuristics + docs
+│   └── archive-analyzer.js # Archive guidance
+├── package.json
+└── README.md
 ```
 
-## Environment
+---
 
-The API uses default port `3000`. To change:
+## 🧪 Testing
+
+### Test Health Check
+```bash
+curl http://localhost:3001/health
+```
+
+### Test MSI Analysis
+```bash
+curl -X POST http://localhost:3001/analyzeApp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://keepass.info/download.html",
+    "installerUrl": "https://sourceforge.net/.../KeePass-2.60.msi",
+    "filename": "KeePass-2.60.msi"
+  }'
+```
+
+### Test EXE Analysis
+```bash
+curl -X POST http://localhost:3001/analyzeApp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://www.7-zip.org/download.html",
+    "installerUrl": "https://www.7-zip.org/a/7z2501-x64.exe",
+    "filename": "7z2501-x64.exe"
+  }'
+```
+
+---
+
+## 📊 Error Handling
+
+### Invalid URL
+```json
+{
+  "success": false,
+  "reason": "invalid_url",
+  "error": "Installer URL must be an HTTP or HTTPS URL",
+  "message": "Invalid installer URL: \"file:///path/to/file.exe\" is not a valid HTTP(S) URL"
+}
+```
+
+### Server Error
+```json
+{
+  "error": "Analysis failed",
+  "message": "Failed after 3 attempts: Network timeout"
+}
+```
+
+---
+
+## 🔌 Dependencies
+
+```json
+{
+  "express": "^4.18.2",
+  "cors": "^2.8.5",
+  "node-fetch": "^3.3.0",
+  "cheerio": "^1.0.0-rc.12"
+}
+```
+
+---
+
+## 📝 Environment Variables
 
 ```javascript
-// backend/index.js
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 ```
 
-## Dependencies
+To change port:
+```bash
+PORT=8080 npm start
+```
 
-- `express` 4.18.2 - Web framework
-- `cors` 2.8.5 - CORS middleware
-- `node-fetch` 3.3.2 - HTTP client
-- `cheerio` 1.0.0-rc.12 - HTML parser
+---
 
-## License
+## 🚀 Production Deployment
 
-Private project. All rights reserved.
+### Option 1: PM2
+```bash
+npm install -g pm2
+pm2 start server.js --name "app-packaging-backend"
+pm2 save
+pm2 startup
+```
+
+### Option 2: Docker
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3001
+CMD ["node", "server.js"]
+```
+
+---
+
+## 📈 Future Enhancements
+
+- [ ] MSI ProductCode extraction (Windows-only)
+- [ ] Response caching (Redis)
+- [ ] Rate limiting per IP
+- [ ] Authentication tokens
+- [ ] Metrics/logging (Winston)
+
+---
+
+**Backend Server for App Packaging Helper v3.0.0** 🚀

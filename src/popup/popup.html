@@ -10,55 +10,34 @@
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <div class="header-content">
-        <div class="logo">
-          <h1>App Packaging Helper</h1>
-        </div>
-        <div>
-          <button id="themeToggle" class="theme-toggle" title="Toggle theme">
-            <span class="theme-icon">🌙</span>
-          </button>
-        </div>
+      <h1>📦 App Packaging Helper</h1>
+      <div class="header-right">
+        <!-- Backend status will be inserted here by JavaScript -->
+        <button id="themeToggle" class="theme-toggle" title="Toggle theme">
+          <span class="theme-icon">🌙</span>
+        </button>
       </div>
     </div>
 
     <!-- Actions Bar -->
     <div class="actions">
       <button id="scanBtn" class="btn btn-primary">
-        <span class="icon">🔍</span> Scan Current Page
+        🔍 Scan Current Page
       </button>
-      <button id="refreshBtn" class="btn btn-secondary">
-        <span class="icon">🔄</span> Refresh
+      <button id="captureBtn" class="btn btn-secondary" style="margin-top: 8px;">
+        📥 Capture Download
       </button>
     </div>
 
-    <!-- Status Message -->
-    <div id="statusMessage" class="status-message hidden"></div>
-
-    <!-- Installers List -->
-    <div id="installersContainer" class="installers-container">
-      <div id="noInstallers" class="no-installers">
-        <p>No installers detected on this page.</p>
-        <p class="hint">Click "Scan Current Page" to search for .exe, .msi, or .msix files.</p>
-      </div>
-
-      <div id="installersList" class="installers-list hidden"></div>
+    <!-- Capture Mode Banner -->
+    <div id="captureModeBanner" class="capture-banner" style="display: none;">
+      <p>✅ <strong>Capture mode ready!</strong></p>
+      <p class="hint">Now click the download button on the page. We'll capture the installer URL automatically.</p>
+      <button id="cancelCaptureBtn" class="btn-link">Cancel</button>
     </div>
 
-    <!-- Packaging Info Modal (initially hidden) -->
-    <div id="packagingModal" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Packaging Information</h2>
-          <button id="closeModal" class="btn-close">&times;</button>
-        </div>
-        <div id="packagingContent" class="modal-body"></div>
-        <div class="modal-footer">
-          <button id="copyAllBtn" class="btn btn-primary">Copy All</button>
-          <button id="closeModalBtn" class="btn btn-secondary">Close</button>
-        </div>
-      </div>
-    </div>
+    <!-- Results Section -->
+    <div id="results" class="results"></div>
   </div>
 
   <script src="popup.js"></script>
