@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const { crawlAndAnalyze } = require('./crawler');
+const { generateIntuneScripts } = require('./generators/intune-scripts');
+const JSZip = require('jszip');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -9,61 +11,82 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-/**
- * Validate if URL is HTTP(S)
- */
-function isHttpUrl(value) {
-  if (!value || typeof value !== 'string') return false;
-  try {
-    const u = new URL(value);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Main analysis endpoint
-app.post('/analyzeApp', async (req, res) => {
-  const { url, installerUrl, filename } = req.body;
-
-  if (!url || !installerUrl || !filename) {
-    return res.status(400).json({
-      error: 'Missing required fields: url, installerUrl, filename'
-    });
-  }
-
-  // Validate installer URL is HTTP(S)
-  if (!isHttpUrl(installerUrl)) {
-    console.warn('[Server] ⚠️ Invalid installer URL (not HTTP/HTTPS):', installerUrl);
-    return res.status(400).json({
-      success: false,
-      reason: 'invalid_url',
-      error: 'Installer URL must be an HTTP or HTTPS URL',
-      message: `Invalid installer URL: "${installerUrl}" is not a valid HTTP(S) URL`
-    });
-  }
-
-  console.log(`[Server] Analysis request for: ${filename}`);
-  console.log(`[Server] Page URL: ${url}`);
-  console.log(`[Server] Installer URL: ${installerUrl}`);
-
+// Analyze installer endpoint
+app.post('/analyze', async (req, res) => {
   try {
-    const result = await crawlAndAnalyze(url, installerUrl, filename);
+    console.log('[Server] Received analysis request:', req.body);
     
-    console.log(`[Server] Analysis complete. Crawled ${result.pagesCrawled} pages`);
+    const { pageUrl, installerUrl, filename } = req.body;
     
+    if (!pageUrl || !installerUrl || !filename) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: pageUrl, installerUrl, or filename'
+      });
+    }
+    
+    const result = await crawlAndAnalyze(pageUrl, installerUrl, filename);
+    
+    console.log('[Server] Analysis complete');
     res.json(result);
+    
   } catch (error) {
-    console.error('[Server] Analysis failed:', error);
+    console.error('[Server] Analysis error:', error);
     res.status(500).json({
-      error: 'Analysis failed',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      success: false,
+      error: error.message || 'Analysis failed'
+    });
+  }
+});
+
+// Generate Intune scripts endpoint
+app.post('/generateIntuneScripts', async (req, res) => {
+  try {
+    console.log('[Server] Generating Intune scripts...');
+    
+    const packagingData = req.body;
+    
+    if (!packagingData || !packagingData.filename) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid packaging data. Missing required fields.' 
+      });
+    }
+    
+    const scripts = generateIntuneScripts(packagingData);
+    
+    const zip = new JSZip();
+    
+    zip.file('Install.ps1', scripts.installScript);
+    zip.file('Uninstall.ps1', scripts.uninstallScript);
+    zip.file('Detection.ps1', scripts.detectionScript);
+    zip.file('metadata.json', scripts.metadataJson);
+    zip.file('README.txt', scripts.readmeText);
+    
+    if (scripts.intuneWrapperScript) {
+      zip.file('Create-IntunePackage.ps1', scripts.intuneWrapperScript);
+    }
+    
+    const zipBase64 = await zip.generateAsync({ type: 'base64' });
+    
+    console.log('[Server] Intune scripts generated successfully');
+    
+    res.json({
+      success: true,
+      zipBase64: zipBase64,
+      filename: `${packagingData.classification?.baseName || 'App'}-${packagingData.version || 'v1'}-Intune-Scripts.zip`
+    });
+    
+  } catch (error) {
+    console.error('[Server] Error generating Intune scripts:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate Intune scripts'
     });
   }
 });

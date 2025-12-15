@@ -11,7 +11,14 @@ A Chrome Extension for IT admins who package applications for Intune, SCCM, and 
 
 The backend performs all crawling and analysis to avoid CORS restrictions and provide reliable, vendor-documented packaging information.
 
-> **✅ Latest Update (v3.0.0):** Extension has been fully migrated to backend-driven architecture. All crawling and analysis now happens server-side for maximum reliability and accuracy.
+> **✅ Latest Update (v1.0.2 - December 14, 2025):**
+> - ✅ **ZIP Bundle Download**: Download complete Intune package with all PowerShell scripts, detection rules, and instructions
+> - ✅ **Enhanced Download Capture**: Improved capture mode with persistent storage - downloads saved even when popup closes
+> - ✅ **Smart Filename Extraction**: Automatically extracts installer names from complex URLs (Google Chrome, Microsoft Edge, etc.)
+> - ✅ **Robust Error Handling**: Enhanced service worker with detailed logging and proper message port handling
+> - ✅ **Backend Crash Protection**: Backend no longer crashes on empty filenames or malformed URLs
+> - 🔧 **Fixed**: Service worker caching issues resolved with new versioning system
+> - 🔧 **Fixed**: Backend connection status now correctly reflects server state
 
 ---
 
@@ -20,18 +27,17 @@ The backend performs all crawling and analysis to avoid CORS restrictions and pr
 ### 1. Setup Backend Server (Required)
 
 ```bash
-# Clone repository
-git clone https://github.com/DimaVasilenko-Intune/Extensions.git
-cd Extensions/backend
+# Navigate to googleshop backend folder
+cd ChromeExtensions/googleshop/backend
 
 # Install dependencies
 npm install
 
-# Start server
-npm start
+# Start server DIRECTLY with node (not npm start!)
+node server.js
 ```
 
-**Backend runs on:** `http://localhost:3000` (or `3001` if port 3000 is in use)
+**Backend runs on:** `http://localhost:3001`
 
 Keep this terminal window open while using the extension.
 
@@ -43,21 +49,31 @@ Keep this terminal window open while using the extension.
 
 2. **Load Extension:**
    - Click "Load unpacked"
-   - Select the `Extensions` folder (parent folder, not backend)
+   - Select the `ChromeExtensions/googleshop` folder (**NOT** the parent folder!)
 
 3. **Verify Connection:**
    - Click extension icon
    - You should see "🟢 Backend: Connected" status in the header
-   - If you see "🔴 Backend: Disconnected", ensure backend is running on port 3000
+   - If you see "🔴 Backend: Disconnected", ensure backend is running: `node server.js`
 
 ### 3. Start Using
 
+**Method 1: Scan Page (for visible download links)**
 1. Visit any software download page (e.g., VLC, 7-Zip, Firefox)
 2. Click extension icon
 3. Click **"Scan Current Page"** to detect installers
-4. Click **"Generate Packaging Info"** on any installer
-5. Wait while backend crawls vendor documentation (you'll see a loading modal)
-6. Review results: silent install command, uninstall command, detection rules, and confidence score
+4. Click **"Package for Intune"** on any installer
+5. Review packaging recommendations with install commands, detection rules, and scripts
+6. Click **"📦 Download Complete Package Bundle"** to get ZIP with all scripts!
+
+**Method 2: Capture Download (for hidden/dynamic links)**
+1. Visit download page (e.g., Google Chrome download)
+2. Click extension icon
+3. Click **"📥 Capture Download"**
+4. Click download button on the page (popup will close - this is normal!)
+5. Reopen extension - captured installer appears in list automatically
+6. Click **"Package for Intune"** to generate packaging recommendations
+7. Download complete bundle with all scripts
 
 ---
 
@@ -65,25 +81,25 @@ Keep this terminal window open while using the extension.
 
 ### Extension Features (Frontend)
 - ✅ **Auto-detect installers** - Scans pages for .exe, .msi, .msix files
+- ✅ **Download capture mode** - Captures dynamic/hidden download URLs with persistent storage
+- ✅ **ZIP bundle generation** - Download complete Intune package with all scripts and instructions
 - ✅ **Backend status indicator** - Real-time connection status in header
 - ✅ **Loading states** - Visual feedback during backend analysis
-- ✅ **Results modal** - Detailed packaging info with copy buttons
+- ✅ **Packaging panel** - Detailed recommendations with copy buttons for all commands
 - ✅ **Light/Dark mode** - Automatic system theme detection
-- ✅ **Export to JSON** - Save packaging info for later use
 - ✅ **Error handling** - Clear messages when backend unavailable
+- ✅ **Smart filename extraction** - Handles complex URLs from Google, Microsoft, etc.
 
 ### Backend Features (The Real Power)
-- ✅ **Multi-page documentation crawler** - Follows up to 15 relevant doc pages
-- ✅ **Smart link detection** - Prioritizes pages with keywords: deploy, install, silent, unattended, intune, enterprise, msi
-- ✅ **Advanced command extraction** - Finds silent switches in `<code>`, `<pre>`, `<script>`, paragraphs, lists
-- ✅ **Uninstall command detection** - Discovers vendor-documented uninstall methods
-- ✅ **Detection rule generation** - Extracts file paths and registry keys from docs
-- ✅ **MSI ProductCode scanning** - Finds GUIDs matching `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`
-- ✅ **Confidence scoring** - High/Medium/Low based on documentation quality and source
-- ✅ **Version extraction** - Attempts to find version numbers from page content
-- ✅ **Resilient crawling** - Automatic retries (3x), 30s timeouts, duplicate removal
-- ✅ **Source tracking** - Returns URLs of pages where commands were found
-- ✅ **Fallback generation** - Provides generic commands with warnings when docs unavailable
+- ✅ **Intune packaging recommendations** - Production-ready install commands, uninstall commands, and detection rules
+- ✅ **Complete script generation** - PowerShell wrapper scripts, detection scripts, and deployment guides
+- ✅ **ZIP bundle creation** - All files packaged and ready for Intune Win32 deployment
+- ✅ **MSI ProductCode extraction** - Automatic detection and uninstall command generation
+- ✅ **EXE silent switch detection** - Common patterns: /S, /SILENT, /VERYSILENT, /quiet, etc.
+- ✅ **Detection rule generation** - File-based and MSI-based detection methods
+- ✅ **Vendor inference** - Automatic detection of software vendor from filename
+- ✅ **Architecture detection** - x64/x86 detection from filename
+- ✅ **Resilient error handling** - Backend never crashes on malformed input
 
 ---
 

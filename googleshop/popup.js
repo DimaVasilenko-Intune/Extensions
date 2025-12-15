@@ -7,13 +7,43 @@
 let currentInstallers = [];
 let backendConnected = false;
 let captureModeActive = false;
+let selectedInstallerIndex = null;
 
 // ============================================
-// GLOBAL COPY BUTTON HANDLER (ISOLATED)
+// INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('[Popup] DOMContentLoaded - Initializing...');
+  console.log('[Popup] Document ready state:', document.readyState);
+  
+  try {
+    // Initialize theme FIRST (before anything else that might break)
+    initializeTheme();
+    
+    setupEventListeners();
+    
+    await checkBackendStatus();
+    await loadSavedInstallers();
+    await loadCapturedDownloadsForCurrentTab();
+    
+    watchSystemTheme();
+    listenForDownloadCapture();
+    setupPackagingPanelListeners();
+    
+    console.log('[Popup] Initialization complete ✓');
+    console.log('[Popup] All buttons should now be clickable');
+  } catch (error) {
+    console.error('[Popup] Initialization error:', error);
+    console.error('[Popup] Stack:', error.stack);
+  }
+});
+
+// ============================================
+// GLOBAL COPY BUTTON HANDLER
 // ============================================
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-copy]');
-  if (!btn) return; // Ignore clicks not on [data-copy] elements
+  if (!btn) return;
 
   const text = btn.getAttribute('data-copy');
   if (!text) return;
@@ -36,52 +66,69 @@ document.addEventListener('click', async (e) => {
 });
 
 // ============================================
-// INITIALIZATION
+// EVENT LISTENERS SETUP
 // ============================================
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[Popup] Initializing...');
-  
-  await checkBackendStatus();
-  setupEventListeners();
-  await loadSavedInstallers();
-  await loadCapturedDownloadsForCurrentTab();
-  initializeTheme();
-  watchSystemTheme();
-  listenForDownloadCapture();
-  
-  console.log('[Popup] Initialization complete');
-});
-
-/**
- * Setup event listeners for main buttons
- */
 function setupEventListeners() {
+  console.log('[Popup] Setting up event listeners...');
+  
   const scanBtn = document.getElementById('scanBtn');
+  console.log('[Popup] scanBtn element:', scanBtn);
   if (scanBtn) {
-    scanBtn.addEventListener('click', scanCurrentPage);
-    console.log('[Popup] Scan button listener attached');
+    scanBtn.addEventListener('click', (e) => {
+      console.log('[Popup] ▶▶▶ SCAN BUTTON CLICKED!', e);
+      scanCurrentPage();
+    });
+    console.log('[Popup] ✓ Scan button listener attached');
   } else {
-    console.error('[Popup] Scan button not found!');
+    console.error('[Popup] ✗ Scan button not found in DOM!');
   }
   
   const captureBtn = document.getElementById('captureBtn');
+  console.log('[Popup] captureBtn element:', captureBtn);
   if (captureBtn) {
-    captureBtn.addEventListener('click', startCaptureMode);
-    console.log('[Popup] Capture button listener attached');
+    captureBtn.addEventListener('click', (e) => {
+      console.log('[Popup] ▶▶▶ CAPTURE BUTTON CLICKED!', e);
+      startCaptureMode();
+    });
+    console.log('[Popup] ✓ Capture button listener attached');
   } else {
-    console.error('[Popup] Capture button not found!');
+    console.error('[Popup] ✗ Capture button not found in DOM!');
   }
   
   const cancelCaptureBtn = document.getElementById('cancelCaptureBtn');
   if (cancelCaptureBtn) {
-    cancelCaptureBtn.addEventListener('click', stopCaptureMode);
-    console.log('[Popup] Cancel capture button listener attached');
+    cancelCaptureBtn.addEventListener('click', (e) => {
+      console.log('[Popup] ▶▶▶ CANCEL CAPTURE CLICKED!', e);
+      stopCaptureMode();
+    });
+    console.log('[Popup] ✓ Cancel capture button listener attached');
   }
   
   const themeToggle = document.getElementById('themeToggle');
+  console.log('[Popup] themeToggle element:', themeToggle);
   if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
-    console.log('[Popup] Theme toggle listener attached');
+    themeToggle.addEventListener('click', (e) => {
+      console.log('[Popup] ▶▶▶ THEME TOGGLE CLICKED!', e);
+      toggleTheme();
+    });
+    console.log('[Popup] ✓ Theme toggle listener attached');
+  } else {
+    console.error('[Popup] ✗ Theme toggle not found in DOM!');
+  }
+  
+  // Test: Add click listener to entire document to see if ANY clicks work
+  document.addEventListener('click', (e) => {
+    console.log('[Popup] Document click detected at:', e.target);
+    console.log('[Popup] Click coordinates:', e.clientX, e.clientY);
+    console.log('[Popup] Target element:', e.target.tagName, e.target.className);
+  }, true); // Use capture phase
+}
+
+function setupPackagingPanelListeners() {
+  const closeBtn = document.getElementById('closePackagingPanel');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hidePackagingPanel);
+    console.log('[Popup] ✓ Close packaging panel listener attached');
   }
 }
 
@@ -91,8 +138,9 @@ function setupEventListeners() {
 async function checkBackendStatus() {
   try {
     const response = await chrome.runtime.sendMessage({ type: 'CHECK_BACKEND' });
-    backendConnected = response.connected;
+    backendConnected = response === true || (response && response.connected === true);
     updateBackendStatusUI(backendConnected);
+    console.log('[Popup] Backend status:', backendConnected ? 'Connected' : 'Disconnected');
   } catch (error) {
     console.error('[Popup] Error checking backend:', error);
     backendConnected = false;
@@ -101,7 +149,26 @@ async function checkBackendStatus() {
 }
 
 function updateBackendStatusUI(connected) {
+  // Wait for DOM to be fully ready
   const headerRight = document.querySelector('.header-right');
+  if (!headerRight) {
+    console.warn('[Popup] header-right not found, retrying in 100ms...');
+    // Retry once after a short delay
+    setTimeout(() => {
+      const retryHeaderRight = document.querySelector('.header-right');
+      if (!retryHeaderRight) {
+        console.error('[Popup] header-right still not found after retry');
+        return;
+      }
+      updateBackendStatusUIInternal(retryHeaderRight, connected);
+    }, 100);
+    return;
+  }
+  
+  updateBackendStatusUIInternal(headerRight, connected);
+}
+
+function updateBackendStatusUIInternal(headerRight, connected) {
   let statusEl = document.getElementById('backend-status');
   
   if (!statusEl) {
@@ -110,17 +177,27 @@ function updateBackendStatusUI(connected) {
     statusEl.className = 'backend-status';
     
     const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-      headerRight.insertBefore(statusEl, themeToggle);
+    if (themeToggle && headerRight && headerRight.contains(themeToggle)) {
+      try {
+        headerRight.insertBefore(statusEl, themeToggle);
+      } catch (e) {
+        console.warn('[Popup] insertBefore failed, using appendChild:', e);
+        headerRight.appendChild(statusEl);
+      }
     } else {
-      headerRight.appendChild(statusEl);
+      if (headerRight) {
+        headerRight.appendChild(statusEl);
+      } else {
+        console.error('[Popup] Cannot add status element - no parent found');
+        return;
+      }
     }
   }
   
   statusEl.textContent = connected ? '🟢 Backend: Connected' : '🔴 Backend: Disconnected';
   statusEl.className = `backend-status ${connected ? 'connected' : 'disconnected'}`;
   statusEl.title = connected 
-    ? 'Backend server is running on http://localhost:3001'
+    ? 'Backend server is running on http://localhost:3001'  // FIXED: 3001
     : 'Backend server not reachable. Run: cd backend && npm start';
 }
 
@@ -128,7 +205,7 @@ function updateBackendStatusUI(connected) {
 // SCAN CURRENT PAGE
 // ============================================
 async function scanCurrentPage() {
-  console.log('[Popup] Scan button clicked');
+  console.log('[Popup] ▶ scanCurrentPage() function called');
   
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
@@ -138,36 +215,33 @@ async function scanCurrentPage() {
   }
 
   const scanBtn = document.getElementById('scanBtn');
-  const originalText = scanBtn?.textContent || '🔍 Scan Current Page';
+  const originalText = scanBtn?.innerHTML || '<span class="btn-icon">🔍</span><span class="btn-text">Scan Current Page</span>';
   
-  // Clear existing results and show scanning state
   currentInstallers = [];
   displayInstallers();
   
   if (scanBtn) {
-    scanBtn.textContent = '🔍 Scanning...';
+    scanBtn.innerHTML = '<span class="btn-icon">🔍</span><span class="btn-text">Scanning...</span>';
     scanBtn.disabled = true;
+    scanBtn.classList.add('scanning');
   }
 
   try {
     console.log('[Popup] Scanning tab:', activeTab.id, activeTab.url);
 
-    // Check if we can scan this page
     if (activeTab.url.startsWith('chrome://') || 
         activeTab.url.startsWith('edge://') ||
         activeTab.url.startsWith('about:')) {
-      throw new Error('Cannot scan browser internal pages');
+      throw new Error('Cannot scan browser internal pages.\n\nPlease navigate to a regular website (http:// or https://)');
     }
 
-    // Inject and execute content script
     const results = await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
-      files: ['src/content/content.js']
+      files: ['content.js']
     });
 
     console.log('[Popup] Script execution results:', results);
 
-    // Validate response
     if (!results || results.length === 0) {
       throw new Error('Content script did not execute');
     }
@@ -182,16 +256,14 @@ async function scanCurrentPage() {
       throw new Error(result.error || 'Content script reported failure');
     }
 
-    // SUCCESS: Process installers
     const installers = Array.isArray(result.installers) ? result.installers : [];
     
-    console.log('[Popup] Found installers:', installers.length);
+    console.log('[Popup] ✓ Found', installers.length, 'installer(s)');
     
     currentInstallers = installers;
     displayInstallers();
     await chrome.storage.local.set({ installers: currentInstallers });
 
-    // Show success status (non-modal)
     if (installers.length > 0) {
       showStatus(`Found ${installers.length} installer(s)!`, 'success');
     } else {
@@ -200,25 +272,13 @@ async function scanCurrentPage() {
     
   } catch (error) {
     console.error('[Popup] Scan error:', error);
-    
-    // Only show error modal for ACTUAL scan failures
-    let errorMessage = `Scan failed: ${error.message}`;
-    
-    if (error.message.includes('Cannot access')) {
-      errorMessage += '\n\nMake sure you\'re on a regular webpage (not chrome:// or edge:// pages)';
-    } else if (error.message.includes('Content script')) {
-      errorMessage += '\n\nTry refreshing the page and scanning again';
-    } else if (error.message.includes('browser internal')) {
-      errorMessage = 'Cannot scan browser internal pages.\n\nPlease navigate to a regular website (http:// or https://)';
-    }
-    
-    showError(errorMessage);
+    showError(error.message || 'Scan failed');
     
   } finally {
-    // Restore button state
     if (scanBtn) {
-      scanBtn.textContent = originalText;
+      scanBtn.innerHTML = originalText;
       scanBtn.disabled = false;
+      scanBtn.classList.remove('scanning');
     }
   }
 }
@@ -227,7 +287,7 @@ async function scanCurrentPage() {
 // CAPTURE DOWNLOAD MODE
 // ============================================
 async function startCaptureMode() {
-  console.log('[Popup] Capture button clicked');
+  console.log('[Popup] ▶ startCaptureMode() function called');
   
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
@@ -248,11 +308,10 @@ async function startCaptureMode() {
       captureModeActive = true;
       showCaptureBanner();
       
-      // Clear download-captured installers from current list
       currentInstallers = currentInstallers.filter(i => i.matchedOn !== 'download-capture');
       displayInstallers();
       
-      console.log('[Popup] Capture mode activated');
+      console.log('[Popup] ✓ Capture mode activated');
       showStatus('Capture mode ready. Click download button on page.', 'info');
     } else {
       showError('Failed to start capture mode');
@@ -274,7 +333,7 @@ async function stopCaptureMode() {
     if (response && response.success) {
       captureModeActive = false;
       hideCaptureBanner();
-      console.log('[Popup] Capture mode deactivated');
+      console.log('[Popup] ✓ Capture mode deactivated');
     }
   } catch (error) {
     console.error('[Popup] Error stopping capture mode:', error);
@@ -325,8 +384,6 @@ async function handleDownloadCaptured(message) {
   else if (filename.endsWith('.pkg')) type = 'pkg';
   else if (filename.endsWith('.zip')) type = 'zip';
   else if (filename.endsWith('.7z')) type = '7z';
-  else if (filename.endsWith('.rar')) type = 'rar';
-  else if (filename.endsWith('.tar.gz') || filename.endsWith('.tgz')) type = 'tar.gz';
   
   const installer = {
     filename: d.filename,
@@ -421,11 +478,6 @@ async function loadSavedInstallers() {
     if (result.installers && result.installers.length > 0) {
       currentInstallers = result.installers;
       displayInstallers();
-    } else {
-      const resultsDiv = document.getElementById('results');
-      if (resultsDiv) {
-        resultsDiv.innerHTML = '<p class="no-results">No installers detected. Click "Scan Current Page".</p>';
-      }
     }
   } catch (error) {
     console.error('[Popup] Error loading installers:', error);
@@ -447,22 +499,31 @@ function displayInstallers() {
     return;
   }
 
+  console.log('[Popup] Rendering', currentInstallers.length, 'installers');
+
   currentInstallers.forEach((installer, index) => {
     const card = document.createElement('div');
     card.className = 'installer-card';
     
     const hasValidUrl = isValidInstallerUrl(installer.url);
-    const buttonDisabled = !backendConnected || !hasValidUrl;
+    const analyzeDisabled = !backendConnected || !hasValidUrl;
+    const packageDisabled = !backendConnected || !hasValidUrl;
     
-    let buttonText = '🔍 Generate Packaging Info';
-    let buttonTitle = '';
+    let analyzeButtonText = '🔍 Generate Packaging Info';
+    let analyzeButtonTitle = '';
+    let packageButtonText = '💼 Package for Intune';
+    let packageButtonTitle = '';
     
     if (!backendConnected) {
-      buttonText = '⚠️ Backend Required';
-      buttonTitle = 'Backend server not connected';
+      analyzeButtonText = '⚠️ Backend Required';
+      analyzeButtonTitle = 'Backend server not connected';
+      packageButtonText = '⚠️ Backend Required';
+      packageButtonTitle = 'Backend server not connected';
     } else if (!hasValidUrl) {
-      buttonText = '⚠️ No Download URL';
-      buttonTitle = 'No direct download URL detected – analysis disabled';
+      analyzeButtonText = '⚠️ No Download URL';
+      analyzeButtonTitle = 'No direct download URL detected';
+      packageButtonText = '⚠️ No Download URL';
+      packageButtonTitle = 'No direct download URL detected';
     }
     
     card.innerHTML = `
@@ -472,23 +533,51 @@ function displayInstallers() {
         <span class="installer-type">${installer.type.toUpperCase()}</span>
         ${installer.confidence ? `<span class="installer-confidence ${getConfidenceClass(installer.confidence)}">${getConfidenceLabel(installer.confidence)}</span>` : ''}
       </div>
-      <button 
-        class="generate-btn" 
-        data-index="${index}"
-        ${buttonDisabled ? 'disabled' : ''}
-        ${buttonTitle ? `title="${buttonTitle}"` : ''}
-      >
-        ${buttonText}
-      </button>
+      <div class="button-group">
+        <button 
+          class="generate-btn" 
+          data-index="${index}"
+          ${analyzeDisabled ? 'disabled' : ''}
+          ${analyzeButtonTitle ? `title="${analyzeButtonTitle}"` : ''}
+        >
+          ${analyzeButtonText}
+        </button>
+        <button 
+          class="package-btn" 
+          data-index="${index}"
+          ${packageDisabled ? 'disabled' : ''}
+          ${packageButtonTitle ? `title="${packageButtonTitle}"` : ''}
+        >
+          ${packageButtonText}
+        </button>
+      </div>
     `;
-    
-    const button = card.querySelector('.generate-btn');
-    if (button && !buttonDisabled) {
-      button.addEventListener('click', () => generatePackagingInfo(index));
-    }
     
     resultsDiv.appendChild(card);
   });
+  
+  // Attach event listeners AFTER rendering
+  console.log('[Popup] Attaching installer button listeners...');
+  
+  document.querySelectorAll('.generate-btn:not([disabled])').forEach((btn, idx) => {
+    console.log('[Popup] Attaching generate-btn listener to button', idx);
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+      console.log('[Popup] ▶▶▶ GENERATE button clicked for installer', index);
+      generatePackagingInfo(index);
+    });
+  });
+  
+  document.querySelectorAll('.package-btn:not([disabled])').forEach((btn, idx) => {
+    console.log('[Popup] Attaching package-btn listener to button', idx);
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+      console.log('[Popup] ▶▶▶ PACKAGE button clicked for installer', index);
+      packageForIntune(index);
+    });
+  });
+  
+  console.log('[Popup] ✓ Installers rendered and event listeners attached');
 }
 
 function isValidInstallerUrl(url) {
@@ -496,7 +585,7 @@ function isValidInstallerUrl(url) {
 }
 
 // ============================================
-// GENERATE PACKAGING INFO
+// GENERATE PACKAGING INFO (OLD ANALYZE)
 // ============================================
 async function generatePackagingInfo(index) {
   const installer = currentInstallers[index];
@@ -507,7 +596,7 @@ async function generatePackagingInfo(index) {
   }
   
   if (!backendConnected) {
-    showError('Backend server not connected. Please start backend server:\n\ncd backend\nnpm install\nnpm start');
+    showError('Backend server not connected. Please start backend server:\n\ncd backend\nnpm install\nnpm start\n\nBackend should run on http://localhost:3001');  // FIXED: 3001
     return;
   }
 
@@ -520,11 +609,7 @@ async function generatePackagingInfo(index) {
       throw new Error('Cannot access current page URL');
     }
 
-    console.log('[Popup] Requesting analysis from backend:', {
-      pageUrl: activeTab.url,
-      installerUrl: installer.url,
-      filename: installer.filename
-    });
+    console.log('[Popup] Requesting analysis from backend');
 
     const response = await chrome.runtime.sendMessage({
       type: 'ANALYZE_INSTALLER',
@@ -546,7 +631,7 @@ async function generatePackagingInfo(index) {
           '2. cd backend\n' +
           '3. npm install (first time only)\n' +
           '4. npm start\n\n' +
-          'Backend should run on http://localhost:3001'
+          'Backend should run on http://localhost:3001'  // FIXED: 3001
         );
       } else {
         showError(`Analysis failed: ${response.message || response.error}`);
@@ -561,6 +646,355 @@ async function generatePackagingInfo(index) {
     console.error('[Popup] Analysis error:', error);
     showError(`Unexpected error: ${error.message}`);
   }
+}
+
+// ============================================
+// PACKAGE FOR INTUNE (FIXED)
+// ============================================
+async function packageForIntune(index) {
+  const installer = currentInstallers[index];
+  selectedInstallerIndex = index;
+  
+  if (!isValidInstallerUrl(installer.url)) {
+    showError('Cannot package: No valid download URL available.\n\nThis installer was detected from text only.');
+    return;
+  }
+  
+  if (!backendConnected) {
+    showError('Backend server not connected. Please start backend server:\n\ncd backend\nnpm install\nnpm start\n\nBackend should run on http://localhost:3001');
+    return;
+  }
+
+  const packageBtn = document.querySelector(`.package-btn[data-index="${index}"]`);
+  const originalText = packageBtn?.innerHTML || '💼 Package for Intune';
+  
+  if (packageBtn) {
+    packageBtn.innerHTML = '⏳ Packaging...';
+    packageBtn.disabled = true;
+    packageBtn.classList.add('loading');
+  }
+
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!activeTab?.url) {
+      throw new Error('Cannot access current page URL');
+    }
+
+    console.log('[Popup] Requesting packaging from backend');
+
+    // FIXED: Use callback-based messaging with proper error handling
+    chrome.runtime.sendMessage({
+      type: 'PACKAGE_INSTALLER',
+      installer: {
+        url: installer.url,
+        type: installer.type,
+        fileName: installer.filename,
+        filename: installer.filename, // Support both
+        silentCommand: installer.silentCommand,
+        productCode: installer.productCode
+      },
+      analysis: installer.analysis || {}, // Pass any previous analysis
+      sourceUrl: activeTab.url
+    }, (response) => {
+      // Handle runtime errors
+      if (chrome.runtime.lastError) {
+        console.error('[Popup] Runtime error during packaging:', chrome.runtime.lastError);
+        showError('Unexpected error during packaging: ' + chrome.runtime.lastError.message);
+        
+        if (packageBtn) {
+          packageBtn.innerHTML = originalText;
+          packageBtn.disabled = false;
+          packageBtn.classList.remove('loading');
+        }
+        return;
+      }
+
+      // Handle no response
+      if (!response) {
+        console.error('[Popup] No response from background script');
+        showError('Unexpected error during packaging: No response from background script');
+        
+        if (packageBtn) {
+          packageBtn.innerHTML = originalText;
+          packageBtn.disabled = false;
+          packageBtn.classList.remove('loading');
+        }
+        return;
+      }
+
+      console.log('[Popup] Packaging response received:', response);
+
+      // Handle error in response
+      if (response.error) {
+        showError(`Packaging failed: ${response.error}`);
+        
+        if (packageBtn) {
+          packageBtn.innerHTML = originalText;
+          packageBtn.disabled = false;
+          packageBtn.classList.remove('loading');
+        }
+        return;
+      }
+
+      // Success - response.recommendation contains the full recommendation
+      if (response.success && response.recommendation) {
+        displayPackagingRecommendation(installer, response.recommendation);
+      } else {
+        showError('Unexpected response format from backend');
+      }
+
+      if (packageBtn) {
+        packageBtn.innerHTML = originalText;
+        packageBtn.disabled = false;
+        packageBtn.classList.remove('loading');
+      }
+    });
+
+  } catch (error) {
+    console.error('[Popup] Packaging error:', error);
+    showError(`Unexpected error during packaging: ${error.message}`);
+    
+    if (packageBtn) {
+      packageBtn.innerHTML = originalText;
+      packageBtn.disabled = false;
+      packageBtn.classList.remove('loading');
+    }
+  }
+}
+
+function displayPackagingRecommendation(installer, packagingData) {
+  console.log('[Popup] Displaying packaging recommendation');
+  
+  const panel = document.getElementById('packagingPanel');
+  const content = document.getElementById('packagingContent');
+  
+  if (!panel || !content) {
+    console.error('[Popup] Packaging panel elements not found');
+    return;
+  }
+
+  let html = '<div class="packaging-recommendation">';
+  
+  if (packagingData.displayName) {
+    html += `
+      <div class="packaging-field">
+        <label>Application Display Name</label>
+        <div class="value">${escapeHtml(packagingData.displayName)}</div>
+      </div>
+    `;
+  }
+  
+  if (packagingData.bestInstallCommand) {
+    const escapedCmd = escapeHtml(packagingData.bestInstallCommand);
+    const dataCopy = packagingData.bestInstallCommand.replace(/"/g, '&quot;');
+    html += `
+      <div class="packaging-field">
+        <label>Best Install Command</label>
+        <div class="value code">${escapedCmd}</div>
+        <button class="copy-btn" data-copy="${dataCopy}">📋 Copy</button>
+      </div>
+    `;
+  }
+  
+  if (packagingData.uninstallCommand) {
+    const escapedCmd = escapeHtml(packagingData.uninstallCommand);
+    const dataCopy = packagingData.uninstallCommand.replace(/"/g, '&quot;');
+    html += `
+      <div class="packaging-field">
+        <label>Uninstall Command</label>
+        <div class="value code">${escapedCmd}</div>
+        <button class="copy-btn" data-copy="${dataCopy}">📋 Copy</button>
+      </div>
+    `;
+  }
+  
+  if (packagingData.detectionRule) {
+    const ruleText = typeof packagingData.detectionRule === 'string' 
+      ? packagingData.detectionRule 
+      : JSON.stringify(packagingData.detectionRule, null, 2);
+    const escapedRule = escapeHtml(ruleText);
+    const dataCopy = ruleText.replace(/"/g, '&quot;');
+    html += `
+      <div class="packaging-field">
+        <label>Detection Rule</label>
+        <div class="value code">${escapedRule}</div>
+        <button class="copy-btn" data-copy="${dataCopy}">📋 Copy</button>
+      </div>
+    `;
+  }
+  
+  if (packagingData.intuneScript) {
+    const escapedScript = escapeHtml(packagingData.intuneScript);
+    const dataCopy = packagingData.intuneScript.replace(/"/g, '&quot;');
+    html += `
+      <div class="packaging-field">
+        <label>Intune Script</label>
+        <div class="value script">${escapedScript}</div>
+        <button class="copy-btn" data-copy="${dataCopy}">📋 Copy</button>
+        <div class="note">Copy this script to use in Intune Win32 app deployment</div>
+      </div>
+    `;
+  }
+  
+  if (packagingData.notes) {
+    const notes = Array.isArray(packagingData.notes) 
+      ? packagingData.notes 
+      : [packagingData.notes];
+    
+    html += `
+      <div class="packaging-field">
+        <label>Additional Notes</label>
+        <div class="value">
+          <ul style="margin: 0; padding-left: 20px;">
+            ${notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Add download bundle button
+  html += `
+    <div class="packaging-field" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+      <button id="downloadBundleBtn" class="primary-btn" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600;">
+        📦 Download Complete Package Bundle
+      </button>
+      <div class="note" style="margin-top: 8px; text-align: center;">
+        Downloads a ZIP file with all scripts and instructions ready for Intune packaging
+      </div>
+    </div>
+  `;
+  
+  html += '</div>';
+  
+  content.innerHTML = html;
+  panel.style.display = 'block';
+  
+  // Attach download button handler
+  const downloadBtn = document.getElementById('downloadBundleBtn');
+  if (downloadBtn) {
+    downloadBtn.onclick = () => downloadPackageBundle(packagingData);
+  }
+  
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hidePackagingPanel() {
+  const panel = document.getElementById('packagingPanel');
+  if (panel) {
+    panel.style.display = 'none';
+  }
+  selectedInstallerIndex = null;
+}
+
+/**
+ * Download complete package bundle as ZIP
+ */
+async function downloadPackageBundle(recommendation) {
+  console.log('[Popup] Downloading package bundle...');
+  
+  const btn = document.getElementById('downloadBundleBtn');
+  if (!btn) return;
+  
+  const originalText = btn.textContent;
+  
+  try {
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating bundle...';
+    
+    // Call backend via service worker
+    chrome.runtime.sendMessage(
+      {
+        type: 'GENERATE_PACKAGE_BUNDLE',
+        recommendation: recommendation
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Popup] Message error:', chrome.runtime.lastError);
+          btn.textContent = '✗ Error';
+          btn.disabled = false;
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+          return;
+        }
+        
+        if (!response || !response.success) {
+          console.error('[Popup] Bundle generation failed:', response?.error);
+          btn.textContent = '✗ Failed';
+          btn.disabled = false;
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+          return;
+        }
+        
+        console.log('[Popup] Bundle received, downloading...');
+        
+        // Convert base64 to blob and trigger download
+        try {
+          const blob = base64ToBlob(response.zipBase64, 'application/zip');
+          const url = URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = response.filename || 'intune-package.zip';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          btn.textContent = '✓ Downloaded!';
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }, 2000);
+          
+          console.log('[Popup] Bundle downloaded successfully');
+          
+        } catch (error) {
+          console.error('[Popup] Download error:', error);
+          btn.textContent = '✗ Download failed';
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }, 2000);
+        }
+      }
+    );
+    
+  } catch (error) {
+    console.error('[Popup] Bundle download error:', error);
+    btn.textContent = '✗ Error';
+    btn.disabled = false;
+    setTimeout(() => {
+      btn.textContent = originalText;
+    }, 2000);
+  }
+}
+
+/**
+ * Convert base64 string to Blob
+ */
+function base64ToBlob(base64, mimeType) {
+  const byteCharacters = atob(base64);
+  const byteArrays = [];
+  
+  const sliceSize = 512;
+  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+    const slice = byteCharacters.slice(offset, offset + sliceSize);
+    const byteNumbers = new Array(slice.length);
+    
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  
+  return new Blob(byteArrays, { type: mimeType });
 }
 
 // ============================================
@@ -599,10 +1033,10 @@ function getConfidenceClass(confidence) {
 }
 
 // ============================================
-// DISPLAY ANALYSIS RESULTS
+// DISPLAY ANALYSIS RESULTS (OLD)
 // ============================================
 function displayAnalysisResults(installer, backendData) {
-  console.log('[Popup] Displaying results:', backendData);
+  console.log('[Popup] Displaying analysis results');
   
   const packaging = backendData.packaging?.[0];
   
@@ -665,17 +1099,6 @@ function displayAnalysisResults(installer, backendData) {
           </ul>
         </div>
       ` : ''}
-      
-      ${packaging.sourcePages && packaging.sourcePages.length > 0 ? `
-        <div class="sources">
-          <h4>📄 Documentation Sources (${backendData.pagesCrawled || 0} pages crawled)</h4>
-          <ul>
-            ${packaging.sourcePages.slice(0, 5).map(url => 
-              `<li><a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></li>`
-            ).join('')}
-          </ul>
-        </div>
-      ` : ''}
     </div>
   `;
 
@@ -692,7 +1115,6 @@ function renderDetectionRule(detectionRule) {
         <div class="detection-info">
           <p><strong>Type:</strong> MSI ProductCode Detection</p>
           ${detectionRule.note ? `<p class="note">${escapeHtml(detectionRule.note)}</p>` : ''}
-          ${detectionRule.recommendation ? `<p class="recommendation">💡 ${escapeHtml(detectionRule.recommendation)}</p>` : ''}
         </div>
       </div>
     `;
@@ -710,19 +1132,6 @@ function renderDetectionRule(detectionRule) {
           <p><strong>Type:</strong> File Detection</p>
           <code class="command">${escapedPath}</code>
           <button class="copy-btn" data-copy="${dataCopyPath}">📋 Copy</button>
-          ${detectionRule.note ? `<p class="note">${escapeHtml(detectionRule.note)}</p>` : ''}
-        </div>
-      </div>
-    `;
-  }
-  
-  if (detectionRule.type === 'archive') {
-    return `
-      <div class="command-section">
-        <h4>Detection Rule</h4>
-        <div class="detection-info">
-          <p><strong>Type:</strong> Archive</p>
-          ${detectionRule.note ? `<p class="note">${escapeHtml(detectionRule.note)}</p>` : ''}
         </div>
       </div>
     `;
@@ -753,20 +1162,42 @@ function showStatus(message, type = 'info') {
   if (!message) return;
 
   const container = document.querySelector('.container');
+  if (!container) {
+    console.error('[Popup] Container not found for status message');
+    return;
+  }
+  
   const status = document.createElement('div');
   status.id = 'status-message';
   status.className = `status-message ${type}`;
   status.textContent = message;
   
   const actions = document.querySelector('.actions');
-  if (actions) {
-    actions.after(status);
+  // FIXED: Safe insertBefore with try-catch
+  if (actions && container.contains(actions)) {
+    try {
+      actions.after(status);
+    } catch (e) {
+      console.warn('[Popup] after() failed, using appendChild:', e);
+      container.appendChild(status);
+    }
   } else {
-    container.insertBefore(status, container.firstChild);
+    // Fallback: append to container
+    try {
+      if (container.firstChild) {
+        container.insertBefore(status, container.firstChild);
+      } else {
+        container.appendChild(status);
+      }
+    } catch (e) {
+      console.error('[Popup] Failed to insert status message:', e);
+    }
   }
   
   setTimeout(() => {
-    status.remove();
+    if (status && status.parentNode) {
+      status.remove();
+    }
   }, 3000);
 }
 
@@ -779,7 +1210,7 @@ function showLoadingModal(message) {
     <div class="modal-content">
       <div class="loading-spinner"></div>
       <p>${message}</p>
-      <p class="loading-subtitle">Backend is crawling vendor documentation...</p>
+      <p class="loading-subtitle">Backend is processing...</p>
     </div>
   `;
   document.body.appendChild(modal);
@@ -892,7 +1323,7 @@ async function toggleTheme() {
 
 function updateThemeIcon(theme) {
   const themeIcon = document.querySelector('.theme-icon');
-  if (themeIcon) {
+  if (themeIcon) {  // FIX: Manglende parentheses
     themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
   }
 }

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Packaging Helper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-left">
+        <h1>📦 App Packaging Helper</h1>
+      </div>
+      <div class="header-right">
+        <button id="themeToggle" class="theme-toggle" title="Toggle theme" type="button">
+          <span class="theme-icon">🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="captureModeBanner" class="capture-banner" style="display: none;">
+      <div class="capture-banner-content">
+        <span class="capture-icon">📥</span>
+        <span class="capture-text">Capture mode active - Click any download button on the page</span>
+      </div>
+      <button id="cancelCaptureBtn" class="capture-cancel-btn" type="button">Cancel</button>
+    </div>
+
+    <div class="actions">
+      <button id="scanBtn" class="action-btn primary" type="button">
+        <span class="btn-icon">🔍</span>
+        <span class="btn-text">Scan Current Page</span>
+      </button>
+      <button id="captureBtn" class="action-btn secondary" type="button">
+        <span class="btn-icon">📥</span>
+        <span class="btn-text">Capture Download</span>
+      </button>
+    </div>
+
+    <div id="results" class="results">
+      <p class="no-results">No installers detected. Click "Scan Current Page".</p>
+    </div>
+
+    <div id="packagingPanel" class="packaging-panel" style="display: none;">
+      <div class="packaging-header">
+        <h2>💼 Intune Packaging Recommendation</h2>
+        <button id="closePackagingPanel" class="close-packaging-btn" title="Close" type="button">×</button>
+      </div>
+      <div id="packagingContent" class="packaging-content">
+        <p class="packaging-placeholder">Select an installer and click "Package for Intune" to see recommendations.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

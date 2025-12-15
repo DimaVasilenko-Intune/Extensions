@@ -7,39 +7,48 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <h1>📦 App Packaging Helper</h1>
-      <div class="header-right">
-        <!-- Backend status will be inserted here by JavaScript -->
-        <button id="themeToggle" class="theme-toggle" title="Toggle theme">
-          <span class="theme-icon">🌙</span>
-        </button>
+  <div class="popup-container">
+    <!-- Header Section -->
+    <header class="popup-header">
+      <div class="header-title">
+        <span class="header-icon">📦</span>
+        <h1>App Packaging Helper</h1>
       </div>
+      <button id="themeToggle" class="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+        <span class="theme-icon">🌙</span>
+      </button>
+    </header>
+
+    <!-- Backend Status -->
+    <div class="backend-status-container">
+      <!-- Status will be injected here by JavaScript -->
     </div>
 
-    <!-- Actions Bar -->
-    <div class="actions">
+    <!-- Action Buttons -->
+    <section class="action-buttons">
       <button id="scanBtn" class="btn btn-primary">
-        🔍 Scan Current Page
+        <span class="btn-icon">🔍</span>
+        <span class="btn-text">Scan Current Page</span>
       </button>
-      <button id="captureBtn" class="btn btn-secondary" style="margin-top: 8px;">
-        📥 Capture Download
+      <button id="captureBtn" class="btn btn-secondary">
+        <span class="btn-icon">📥</span>
+        <span class="btn-text">Capture Download</span>
       </button>
-    </div>
+    </section>
 
     <!-- Capture Mode Banner -->
     <div id="captureModeBanner" class="capture-banner" style="display: none;">
-      <p>✅ <strong>Capture mode ready!</strong></p>
-      <p class="hint">Now click the download button on the page. We'll capture the installer URL automatically.</p>
+      <p class="banner-title">✅ <strong>Capture mode ready!</strong></p>
+      <p class="banner-hint">Now click the download button on the page. We'll capture the installer URL automatically.</p>
       <button id="cancelCaptureBtn" class="btn-link">Cancel</button>
     </div>
 
     <!-- Results Section -->
-    <div id="results" class="results"></div>
+    <section id="results" class="results-section">
+      <p class="no-results">No installers detected. Click "Scan Current Page".</p>
+    </section>
   </div>
 
-  <script src="popup.js"></script>
+  <script src="../../googleshop/popup.js"></script>
 </body>
 </html>

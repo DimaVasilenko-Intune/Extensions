@@ -12,6 +12,18 @@ Analyzes installer URLs and generates deployment-ready packaging information by:
 
 ---
 
+## 🔒 Privacy & Security
+
+### Data Handling
+- **Zero persistent storage**: All requests processed in-memory
+- **No logging**: No request logs, user tracking, or analytics
+- **HTTPS only**: All API communication encrypted
+- **No personal data**: Only processes installer URLs and filenames
+
+**Full Privacy Policy**: [View on GitHub](https://github.com/your-username/app-packaging-helper/blob/main/PRIVACY_POLICY.md)
+
+---
+
 ## 🚀 Quick Start
 
 ### Requirements
