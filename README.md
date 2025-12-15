@@ -731,7 +731,7 @@ We welcome contributions! Here's how to get started:
 
 - **Issues**: https://github.com/DimaVasilenko-Intune/Extensions/issues
 - **Discussions**: https://github.com/DimaVasilenko-Intune/Extensions/discussions
-- **Email**: (Add your contact email here)
+- **Email**: dmivas@hotmail.com
 
 ---
 
